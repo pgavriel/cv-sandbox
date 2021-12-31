@@ -2,12 +2,15 @@ import cv2 as cv
 import numpy as np
 import utils as ut
 import time
-import os
+import os, sys
 from os.path import isfile, join
+
+sys.path.append(".\\projects\\machina")
+print (sys.path)
 from clockanimator import ClockAnimator
 from path import Path
 from layer import Layer
-
+from recording import record_on_img, record_on_video, extract_frame
 
 
 def check(lbl=None):
@@ -69,129 +72,102 @@ def export_layers(layers,out_file):
     f.close()
     print("LAYERS EXPORTED TO " + out_file)
 
-def record(background_image,layers,seconds,name="recording",fps=30):
-    (h, w) = background_image.shape[:2]
-    recorder = cv.VideoWriter(ut.generate_filename(name, '.avi'), cv.VideoWriter_fourcc(*'MJPG'), fps, (w, h))
-    frame = 0
-    end_frame = int(seconds * fps)
-
-    # Modify layers before animating
-    im_file = "img/tail5.png"
-    for l in layers:
-        l.load_image(im_file)
-        l.set_rotation_hz(1/(l.scale*20))
-
-    t = time.time()
-    while frame < end_frame:
-        bkg = background.copy()
-        for l in layers:
-            l.draw_on(bkg)
-            l.update()
-        recorder.write(bkg[:,:,:-1])
-        frame = frame + 1  
-        nt = time.time()
-        dt = nt - t
-        t = nt
-        # if frame % 5 == 0:
-        print("Frame {}/{} - {}s".format(frame,end_frame,str(round(dt,2))))
-
-    print("Done writing.")
-    recorder.release()
-
-def record_clocks(background_image,clocks,seconds,name="recording",fps=30):
-    (h, w) = background_image.shape[:2]
-    recorder = cv.VideoWriter(ut.generate_filename(name, '.avi'), cv.VideoWriter_fourcc(*'MJPG'), fps, (w, h))
-    frame = 0
-    end_frame = int(seconds * fps)
-
-    # Modify layers before animating
-    for c in clocks:
-        c.layer.set_rotation_hz(1/(c.layer.scale*20))
-    # clock.layer.set_rotation_hz(1)
-
-    t = time.time()
-    while frame < end_frame:
-        bkg = background.copy()
-        for c in clocks:
-            bkg = c.draw_on(bkg,c=(0,0,0,255))
-            c.step()
-        recorder.write(bkg[:,:,:-1])
-        frame = frame + 1  
-        nt = time.time()
-        dt = nt - t
-        t = nt
-        # if frame % 5 == 0:
-        print("Frame {}/{} - {}s".format(frame,end_frame,str(round(dt,2))))
-
-    print("Done writing.")
-    recorder.release()
-
-def record_clocks_over_video(video_file,clocks,name="overlay",fps=30):
-    reader = cv.VideoCapture(video_file) 
-    
-    
-    recorder = cv.VideoWriter(ut.generate_filename(name, '.avi'), cv.VideoWriter_fourcc(*'MJPG'), fps, (w, h))
-    frame_count = 0
-    end_frame = reader.get(cv.CAP_PROP_FRAME_COUNT)
-    
-    # Modify layers before animating
-    for c in clocks:
-        c.layer.set_rotation_hz(1/(c.layer.scale*20))
-    # clock.layer.set_rotation_hz(1)
-
-    t = time.time()
-    while frame_count < end_frame:
-        ret, frame = reader.read()
-        frame_count += 1
-
-        # bkg = background.copy()
-        frame = cv.cvtColor(frame, cv.COLOR_RGB2RGBA)
-        frame[:, :, 3] = 255
-        for c in clocks:
-            frame = c.draw_on(frame,c=(0,0,0,255))
-            c.step()
-        recorder.write(frame[:,:,:-1]) 
-        nt = time.time()
-        dt = nt - t
-        t = nt
-        # if frame % 5 == 0:
-        print("Frame {}/{} - {}s".format(frame_count,end_frame,str(round(dt,2))))
-
-    print("Done writing.")
-    recorder.release()
-
 
 if __name__ == "__main__":
     #CV Window and Trackbars
     cv.namedWindow("Layers",cv.WINDOW_AUTOSIZE)
     cv.setMouseCallback("Layers", click_event)
 
-    # background = cv.imread("img/cleanup3.png",cv.IMREAD_UNCHANGED)
-    background = cv.imread("clock_ref.png",cv.IMREAD_UNCHANGED)
-    background = ut.scale_image(background,25)
+    im_file = "img/layer1.png"
+    background = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    # background = ut.scale_image(background,25)
     print("Background Shape: ",background.shape)
 
     l_imgs = []
-    im_file = "img/tail5.png"
-    spinner = cv.imread(im_file,cv.IMREAD_UNCHANGED)
-    # spinner = ut.scale_image(spinner,25)
-    
-    l_imgs.append([spinner, im_file])
     i_select = 0
+    im_file = "img/chest1.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    l_imgs.append([img1, im_file])
+    im_file = "img/chest2.png"
+    img2 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    l_imgs.append([img2, im_file])
+    
 
     (h, w) = background.shape[:2]
-    l1 = Layer(image=l_imgs[i_select][0],im_file=l_imgs[i_select][1])
-    l1.set_rotation_hz(1.0)
-    l1.scale = 0.5
-    l1.translation = [w//2, h//2]
-    layers = [l1]
-    layers = []
     layer_selection = 0
 
-    clocks = []
-    
+    im_file = "img/bench.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    # img1 = ut.scale_image(img1,25)
+    bench = Layer(image=img1,im_file=im_file)
+    bench.translation = [w//2, h//2]
+    im_file = "img/components.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    # img1 = ut.scale_image(img1,25)
+    components = Layer(image=img1,im_file=im_file)
+    components.translation = [w//2, h//2]
+    im_file = "img/bench_components.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    # img1 = ut.scale_image(img1,25)
+    bench_components = Layer(image=img1,im_file=im_file)
+    bench_components.translation = [w//2, h//2]
+    im_file = "img/soul.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    # img1 = ut.scale_image(img1,25)
+    soul = Layer(image=img1,im_file=im_file)
+    soul.translation = [w//2, h//2]
+    im_file = "img/soul_hand2.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    # img1 = ut.scale_image(img1,25)
+    soul_hand = Layer(image=img1,im_file=im_file)
+    soul_hand.translation = [w//2, h//2]
+    im_file = "img/chest1.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    chest1 = Layer(image=img1,im_file=im_file)
+    chest1.translation = [579*4, 405*4]
+    chest1.scale = 0.27738957312183404*4
+    chest1.set_rotation_hz(0.2)
+    im_file = "img/chest2.png"
+    img1 = cv.imread(im_file,cv.IMREAD_UNCHANGED)
+    chest2 = Layer(image=img1,im_file=im_file)
+    chest2.translation = [636*4, 387*4]
+    chest2.scale = 0.2503440897424552*4
+
+    # SOUL RENDER
+    # import floor_path_def as fp
+    # draw_list += [soul,chest1,fp.soul_paths[1],chest2,fp.soul_paths[0],soul_hand]
+
+    # FULL RENDER SETUP
+    import floor_path_def as fp
     import clock_def
-    clocks = clock_def.clocks_a
+    draw_list = clock_def.clocks_a + clock_def.clocks_b +clock_def.clocks_c + clock_def.clocks_d + clock_def.clocks_e
+    for c in draw_list:
+        c.layer.set_rotation_hz(1/(c.layer.scale*40))
+    draw_list += fp.rear_chipset
+    draw_list += fp.chip3
+    draw_list.append(bench)
+    draw_list += fp.chip1
+    draw_list += fp.chip2
+    draw_list += fp.chip3_extra
+
+    draw_list += fp.random1 + fp.random2 + fp.random3 + fp.random4
+    draw_list.append(components)
+    draw_list.append(bench_components)
+
+    draw_list += [soul,chest1,fp.soul_paths[1],chest2,fp.soul_paths[0],soul_hand]
+    for d in draw_list:
+        if type(d) is Path:
+            d.scale(4)
+            d.w_size = 8
+        if type(d) is ClockAnimator:
+            paths = []
+            for p in d.paths:
+                # x = p
+                p.scale(4)
+                # paths.append(x)
+            # d.paths = paths
+            d.layer.scale_layer(4)
+    # draw_list = []
 
     running = True
     keep_updating = False
@@ -202,66 +178,90 @@ if __name__ == "__main__":
         # bkg = background.copy()
         # print("select: ",layer_selection)
         if mouse_changed:
-            layers[layer_selection].translation = mouse_xy
+            draw_list[layer_selection].translation = mouse_xy
             mouse_changed = False
 
         if redraw:
+            print("Redraw")
             bkg = background.copy()
             counter = 0
-            for l in layers:
-                if counter != layer_selection:
-                    if keep_updating: l.update()
-                    l.draw_on(bkg)
-                counter = counter + 1
-            for c in clocks:
-                bkg = c.draw_on(bkg)
-                c.step()
+            types_list = []
+            for x in draw_list:
+                # if counter == layer_selection:
+                #     counter += 1
+                #     continue
+                counter += 1
+                if type(x) is Layer:
+                    types_list.append("Layer")
+                    # print("Drawing Layer")
+                    x.draw_on(bkg)
+                    if keep_updating: x.step()
+                elif type(x) is Path:
+                    types_list.append("Path")
+                    # print("Drawing Path")
+                    bkg = x.draw_on(bkg)
+                    if keep_updating: x.step()
+                elif type(x) is ClockAnimator:
+                    types_list.append("ClockAnimator")
+                    # print("Drawking ClockAnimator")
+                    bkg = x.draw_on(bkg,c=(0,0,0,255))
+                    if keep_updating: x.step()
+                else:
+                    types_list.append("Unknown")
+                    print("Unknown draw object type")
+                    print(type(x))
+                    print(x)
+                
+            print(types_list)
             redraw = False
         
-        saved_bkg = bkg.copy()
-        if len(layers) > 0:
-            if keep_updating: layers[layer_selection].update()
-            layers[layer_selection].draw_on(saved_bkg)
+        # saved_bkg = bkg.copy()
+        # if len(draw_list) > 0:
+        #     if keep_updating: draw_list[layer_selection].step()
+        #     saved_bkg = draw_list[layer_selection].draw_on(saved_bkg)
 
         show_overlay = True
-        if show_overlay and len(layers) > 0:
-            cv.circle(saved_bkg,layers[layer_selection].translation,3,(0,0,255,100),-1)
-        cv.imshow("Layers",saved_bkg)
+        if show_overlay and len(draw_list) > 0:
+            if type(draw_list[layer_selection]) is Layer:
+                cv.circle(saved_bkg,draw_list[layer_selection].translation,3,(0,0,255,100),-1)
+        
+        # cv.imshow("Layers",saved_bkg)
+        cv.imshow("Layers",bkg)
 
         k = cv.waitKey(delay) & 0xFF
         if k == ord('1'):
-            layer_selection = (layer_selection - 1) % len(layers)
+            layer_selection = (layer_selection - 1) % len(draw_list)
             redraw = True
             print("Layer",layer_selection+1)
         if k == ord('2'):
-            layer_selection = (layer_selection + 1) % len(layers)
+            layer_selection = (layer_selection + 1) % len(draw_list)
             redraw = True
             print("Layer",layer_selection+1)
         if k == ord('3'):
             layer = Layer(image=l_imgs[i_select][0],im_file=l_imgs[i_select][1])
-            layers.append(layer)
-            layer_selection = len(layers) - 1
+            draw_list.append(layer)
+            layer_selection = len(draw_list) - 1
             redraw = True
         if k == ord('w'): # Move Up 
-            layers[layer_selection].translation[1] = layers[layer_selection].translation[1] - t_inc
+            draw_list[layer_selection].translation[1] = draw_list[layer_selection].translation[1] - t_inc
         if k == ord('s'): # Move Down
-            layers[layer_selection].translation[1] = layers[layer_selection].translation[1] + t_inc
+            draw_list[layer_selection].translation[1] = draw_list[layer_selection].translation[1] + t_inc
         if k == ord('a'): # Move Left
-            layers[layer_selection].translation[0] = layers[layer_selection].translation[0] - t_inc
+            draw_list[layer_selection].translation[0] = draw_list[layer_selection].translation[0] - t_inc
         if k == ord('d'): # Move Right
-            layers[layer_selection].translation[0] = layers[layer_selection].translation[0] + t_inc
+            draw_list[layer_selection].translation[0] = draw_list[layer_selection].translation[0] + t_inc
         if k == ord('r'): # Increase Scale
-            layers[layer_selection].scale = layers[layer_selection].scale + (layers[layer_selection].scale*0.05)
-            layers[layer_selection].set_rotation_hz(1/layers[layer_selection].scale)
+            draw_list[layer_selection].scale = draw_list[layer_selection].scale + (draw_list[layer_selection].scale*0.05)
+            draw_list[layer_selection].set_rotation_hz(1/draw_list[layer_selection].scale)
         if k == ord('f'): # Decrease Scale
-            layers[layer_selection].scale = layers[layer_selection].scale - (layers[layer_selection].scale*0.05)
-            layers[layer_selection].set_rotation_hz(1/layers[layer_selection].scale)
+            draw_list[layer_selection].scale = draw_list[layer_selection].scale - (draw_list[layer_selection].scale*0.05)
+            draw_list[layer_selection].set_rotation_hz(1/draw_list[layer_selection].scale)
         if k == ord('t'):
-            layers[layer_selection].rotation = layers[layer_selection].rotation + 45
+            draw_list[layer_selection].rotation = draw_list[layer_selection].rotation + 45
         if k == ord('g'):
-            layers[layer_selection].rotation = layers[layer_selection].rotation - 45
+            draw_list[layer_selection].rotation = draw_list[layer_selection].rotation - 45
         if k == ord('e'):
-            layers[layer_selection].set_rotation_hz(1/layers[layer_selection].scale)
+            draw_list[layer_selection].set_rotation_hz(1/draw_list[layer_selection].scale)
         # if k == ord('z'):
         #     layers = import_layers("layers.csv")
         #     redraw = True
@@ -270,22 +270,32 @@ if __name__ == "__main__":
         if k == ord('p'):
             cv.waitKey(0)
         if k == ord('l'): # Record animation
-            # record(background,layers,2)
-            record_clocks(background,clocks,5)
+            # record_layers(background,layers,15)
+            # record_clocks(background,clocks,60)
+            record_on_img(background,draw_list,60,name="v4renderfinal")
+            running = False
         if k == ord('k'): # Record animation
             # record(background,layers,5)
-            record_clocks_over_video("recording-12-5-21--23-43-55.avi",clocks)
+            # record_clocks_over_video("recording-12-5-21--23-43-55.avi",clocks)
+            # record_layers_over_video("render0.avi",layers)
+            video_file = "v2render_background.avi"
+            record_on_video(video_file,draw_list,name=video_file[:-4])
+            running = False
+        if k == ord('j'):
+            extract_frame(background,draw_list,250)
+            extract_frame(background,draw_list,251)
+            running = False
         if k == ord('o'):
             counter = 1
             print("LAYERS")
-            for l in layers:
+            for l in draw_list:
                 print(counter,"-",l)
                 counter = counter + 1
         if k == ord('q'):
             running = False
             counter = 1
             print("\nLAYERS")
-            for l in layers:
+            for l in draw_list:
                 print(counter,"-",l)
                 counter = counter + 1
         

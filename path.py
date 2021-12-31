@@ -4,19 +4,34 @@ import numpy as np
 import math
 
 class Path:
-    def __init__(self,points=None,trigger=0):
+    def __init__(self,points=None,trigger=0,hz=0.0,color=(0,0,0,255),w_size=10):
         if points is not None:
             self.points = points
         else:
             self.points = []
 
         self.frame = 0
-        self.fps = 31
-        self.freq = 1.0
-        self.speed = 7
+        self.fps = 30
+        self.freq = hz
+        self.rot = 0
+        self.dr = 0
+        self.set_rotation_hz(hz)
+        
+        # self.speed = 5
+        self.speed = 4
+        self.color = color
         self.walkers = []
+        self.w_size = w_size
         self.trigger = trigger
         self.update_path()
+
+    def scale(self,factor):
+        new_points = []
+        for p in self.points:
+            new_points.append([p[0]*factor,p[1]*factor])
+        self.points = new_points
+        self.update_path()
+
 
     def clear(self):
         self.points = []
@@ -24,10 +39,14 @@ class Path:
         self.update_path()
 
     def deg_offset(self,deg_off):
-        spawn_freq = (self.fps/self.freq)
-        frame_off = deg_off * (spawn_freq/360)
+        self.rot = (self.rot + deg_off) % 360
+        # spawn_freq = (self.fps/self.freq)
+        # frame_off = deg_off * (spawn_freq/360)
         
-        self.frame += int(frame_off)
+        # self.frame += int(frame_off)
+
+    def set_rotation_hz(self, hz):
+        self.dr = hz * (360 / self.fps)
 
     def add_point(self,point):
         self.points.append(point)
@@ -59,8 +78,8 @@ class Path:
                 self.seg_len.append(round(dist,2))
                 self.seg_angle.append(ang)
                 p1 = p
-        print("LEN",self.seg_len)
-        print("ANG",self.seg_angle)
+        # print("LEN",self.seg_len)
+        # print("ANG",self.seg_angle)
 
     def spawn_walker(self):
         if len(self.points) < 2:
@@ -89,9 +108,7 @@ class Path:
                     # print("Seg {} passed, to travel: {}".format(seg,to_travel))
                 else:
                     w[3] = counter # Segment walker is currently on
-                    
                     ang = self.seg_angle[counter] 
-                    # print("Currently on segment", counter, "   Travel angle:",ang)
                     origin = self.points[counter]
                     w[0] = int(origin[0] + (to_travel * math.cos(math.radians(ang))))
                     w[1] = int(origin[1] + (to_travel * -math.sin(math.radians(ang))))
@@ -105,7 +122,13 @@ class Path:
                 # print("Path length exceeded, removing walker\n")
         self.walkers = new_walkers
 
-
+        last_rot = self.rot
+        self.rot = (self.rot + self.dr) % 360
+        # print("last",last_rot,"  rot",self.rot,"  dr",self.dr)
+        if self.dr > 0 and self.rot < last_rot:
+            self.spawn_walker()
+        if self.dr < 0 and self.rot > last_rot:
+            self.spawn_walker()
         # add_walker = int(self.fps/self.freq)
         # print("add at ",add_walker,"  mod ",self.frame % add_walker)
         # if self.frame % add_walker == 0 and len(self.points) > 1:
@@ -115,11 +138,14 @@ class Path:
         self.frame += 1
 
 
-    def draw_on(self,image,c=(0,0,255,255),render_line=True,width=1,w_size=2):
+    def draw_on(self,image,c=None,render_line=True,width=1):
         if len(self.points) == 0:
             return image
 
+        if c is None:
+            c = self.color
         img = image.copy()
+        # print(self.points)
         if len(self.points) == 1:
             cv.circle(img,self.points[0],2,c,-1)
         else:
@@ -129,7 +155,7 @@ class Path:
                     cv.line(img,p1,p,c,width)
                 p1 = p
             for w in self.walkers:
-                cv.circle(img,[w[0],w[1]],w_size,c,-1,cv.LINE_AA)
+                cv.circle(img,[w[0],w[1]],self.w_size,c,-1,cv.LINE_AA)
         return img
         
     
@@ -161,11 +187,11 @@ if __name__ == "__main__":
     cv.namedWindow("Path Test",cv.WINDOW_AUTOSIZE)
     cv.setMouseCallback("Path Test", click_event)
 
-    video_file = 'video_archive/multiclocktest1-12-5-21--15-51-3.avi'
+    video_file = 'render2.avi'
     cap = cv.VideoCapture(video_file) 
     frame_counter = 0
 
-    image_file = "clock_ref.png"
+    image_file = "img/layer1.png"
     background = cv.imread(image_file,cv.IMREAD_UNCHANGED)
     background = ut.scale_image(background,25)
     print("Background Shape: ",background.shape)
@@ -177,8 +203,14 @@ if __name__ == "__main__":
     # path2.freq = 1/(0.119999999999999*20)
     # path2.deg_offset(90)
     # paths = [path1, path2]
+    p1 = Path([[237, 522], [236, 577], [269, 600], [240, 611], [254, 622]],hz=0.8)
+    paths = [p1]
 
-    paths = [Path()]
+    import floor_path_def as fp
+    paths = fp.chip3
+
+    # paths = [Path()]
+    video = False
     running = True
     keep_updating = False
     redraw = True
@@ -186,15 +218,14 @@ if __name__ == "__main__":
     # bkg = background.copy()
     path_select = 0
     while running:
-        bkg = background.copy()
+        if video:
+            _, frame = cap.read()
+            frame_counter += 1
+            if frame_counter == cap.get(cv.CAP_PROP_FRAME_COUNT):
+                frame_counter = 0 # Or whatever as long as it is the same as next line
+                cap.set(cv.CAP_PROP_POS_FRAMES, 0)
 
-        # Video Background
-        ret, frame = cap.read()
-        frame_counter += 1
-        if frame_counter == cap.get(cv.CAP_PROP_FRAME_COUNT):
-            frame_counter = 0 #Or whatever as long as it is the same as next line
-            cap.set(cv.CAP_PROP_POS_FRAMES, 0)
-
+        
 
         if mouse_changed:
             print("Add point",mouse_xy)
@@ -204,15 +235,17 @@ if __name__ == "__main__":
 
         redraw = True
         if redraw:
-
-            # bkg = frame.copy()
-            bkg = background.copy()
+            if video:
+                bkg = frame
+            else:
+                bkg = background.copy()
+            # bkg = background.copy()
             c = 0
             for p in paths:
                 if path_select == c:
                     bkg = p.draw_on(bkg,c=(0,255,0,255),width=1)
                 else:
-                    bkg = p.draw_on(bkg)
+                    bkg = p.draw_on(bkg,c=(0,0,255,255))
                 p.step()
                 c += 1
             redraw = False
@@ -220,7 +253,7 @@ if __name__ == "__main__":
         print("\nPATHS")
         c = 1
         for p in paths:
-            print(c,"-  ",p.points)
+            print("p{} = Path({})".format(c,p.points))
             c += 1
 
         if len(paths[path_select].seg_angle) > 0:
@@ -260,6 +293,7 @@ if __name__ == "__main__":
         if k == ord('e'):
             if len(paths[path_select].points) > 0:
                 paths[path_select].points.pop()
+                paths[path_select].update_path()
                 redraw = True
         if k == ord('r'):
             paths[path_select].clear()
