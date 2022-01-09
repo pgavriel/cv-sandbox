@@ -87,7 +87,7 @@ def shift_color_space(image,amount,sat_boost=0,cvt_back=True):
     if cvt_back: img = cv.cvtColor(img,cv.COLOR_HSV2BGR)
     return img
 
-def get_pixels(image,pos,h=3,w=3,verbose=True):
+def get_pixels(image,pos,h=1,w=1,verbose=True):
     roi = image[pos[0]-w:pos[0]+w,pos[1]-h:pos[1]+h]
     if verbose: print(roi)
     return roi

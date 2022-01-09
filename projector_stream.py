@@ -101,13 +101,12 @@ if __name__ == "__main__":
     draw_layers = True
     animate_layers = True
     layer_selection = 0
-    im_file = "img/tail6.png"
+    im_file = "img/pneuma03-2.png"
     layer_img = cv.imread(im_file,cv.IMREAD_UNCHANGED)
-    tail = Layer(image=layer_img,im_file=im_file)
-    tail.scale = 0.3
-    # tail.ds = Oscillator([math.cos,"+1","/8","+0.3"],step=15,resolution=360)
-    tail.set_rotation_hz(0.1/tail.scale)
-    tail.translation = [266, 282]
+    im_layer = Layer(image=layer_img,im_file=im_file)
+    im_layer.scale = 0.75
+    # im_layer.set_rotation_hz(0.1/tail.scale)
+    im_layer.translation = [266, 282]
     
     osc = Oscillator([math.sin],step=4,offset=0,resolution=360)
     osc.draw_mode = 1
@@ -172,21 +171,27 @@ if __name__ == "__main__":
     tl4.rotation = -20
     tl4.scale = 1
 
-    draw_list = [t_layer,tl2,tl3,tl4,osc2,osc]
+    # draw_list = [t_layer,tl2,tl3,tl4,osc2,osc]
+    draw_list = [im_layer]
 
     #Add patterns? 
 
     #Border Attributes
     add_border = True
-    border_width = 40
-    border_inc = 10
+    border_edit_mode = False
+    toggle_border_top = False
+    toggle_border_bot = False
+    toggle_border_left = False
+    toggle_border_right = False
+    # border_width = 40
     border_mode = 0
     border_color = (255,255,255)
-    dt = 0 + 46
-    db = 0 + 38
-    dl = 0
-    dr = 0
-    border_adj = [dt,db,dl,dr]
+    dtop = 46
+    dbot = 38
+    # dl = 0
+    # dr = 0
+    borders = [40,40,40,40]
+    border_inc = 10
 
     #Implement ImageViewport
     use_viewport = False
@@ -323,7 +328,12 @@ if __name__ == "__main__":
         
 
         if add_border:
-            frame = ut.add_border(frame,border_width,border_mode,border_color,adj=border_adj)
+            adj = []
+            adj.append((0 if toggle_border_top else borders[0])+dtop)
+            adj.append((0 if toggle_border_bot else borders[1])+dbot)
+            adj.append(0 if toggle_border_left else borders[2])
+            adj.append(0 if toggle_border_right else borders[3])
+            frame = ut.add_border(frame,0,border_mode,border_color,adj=adj)
         
         if interlace and frame_num % interlace_skip <= interlace_duration:
             frame[:,:] = interlace_color
@@ -353,17 +363,20 @@ if __name__ == "__main__":
         if recording and recorder is not None:
             if frame.shape[2] == 4:
                 frame = frame[:,:,:-1]
-            frame = frame[dt:-db,black_pad:black_pad+w]
+            frame = frame[dtop:-dbot,black_pad:black_pad+w]
             frame = cv.resize(frame,recorder_dim)
             # print("writing frame size ", frame.shape)
             recorder.write(frame)
         
-        # Timer
+        # LOOP TIMER -----------------------------------------------------------
         loop_time = int((time.time() - start_time)*1000)
         if loop_time > delay:
             print("WARNING Frame Time: {}ms - Desired Delay: {}ms".format(loop_time,delay))
         real_delay = max(1,delay-loop_time)
-        # Keyboard Controls -----------------------------------------------------
+
+
+
+        # KEYBOARD CONTROLS -----------------------------------------------------
         # k = cv.waitKey(delay) & 0xFF
         k = cv.waitKey(real_delay) & 0xFF
         if k != 255: print(k)
@@ -421,11 +434,16 @@ if __name__ == "__main__":
             add_border = not add_border
             print("Border "+("ENABLED"if add_border else "DISABLED"))
         if k == ord('n'): # DECREASE BORDER WIDTH
-            border_width = max(0, border_width - border_inc)
+            for i in range(len(borders)):
+                borders[i] = max(0, borders[i] - border_inc)
         if k == ord('m'): # INCREASE BORDER WIDTH
-            border_width += border_inc
+            for i in range(len(borders)):
+                borders[i] = borders[i] + border_inc
         if k == ord(','): # CHANGE BORDER MODE
             border_mode = (border_mode + 1) % 2 
+        if k == ord('.'): # TOGGLE BORDER EDIT MODE
+            border_edit_mode = not border_edit_mode
+            print("Border Edit Mode "+("ENABLED"if border_edit_mode else "DISABLED"))
 
         # BRIGHTNESS/CONTRAST CONTROLS
         if k == ord('g'): # TOGGLE B/C
@@ -460,14 +478,26 @@ if __name__ == "__main__":
             vp_zoom = vp.set_scale(vp_zoom)
             print("Zoom: ",round(vp_zoom,2))
         dvp = 25
-        if k == ord('w'): # MOVE VP UP
-            vp.offset[1] = vp.offset[1] - max(1,dvp*vp_zoom)
-        if k == ord('s'): # MOVE VP DOWN
-            vp.offset[1] = vp.offset[1] + max(1,dvp*vp_zoom)
-        if k == ord('a'): # MOVE VP LEFT
-            vp.offset[0] = vp.offset[0] - max(1,dvp*vp_zoom)
-        if k == ord('d'): # MOVE VP RIGHT
-            vp.offset[0] = vp.offset[0] + max(1,dvp*vp_zoom)
+        if k == ord('w'): # TOGGLE TOP BORDER / MOVE VP UP
+            if border_edit_mode:
+                toggle_border_top = not toggle_border_top
+            else:
+                vp.offset[1] = vp.offset[1] - max(1,dvp*vp_zoom)
+        if k == ord('s'): # TOGGLE BOTTOM BORDER / MOVE VP DOWN
+            if border_edit_mode:
+                toggle_border_bot = not toggle_border_bot
+            else:
+                vp.offset[1] = vp.offset[1] + max(1,dvp*vp_zoom)
+        if k == ord('a'): # TOGGLE LEFT BORDER / MOVE VP LEFT
+            if border_edit_mode:
+                toggle_border_left = not toggle_border_left
+            else:
+                vp.offset[0] = vp.offset[0] - max(1,dvp*vp_zoom)
+        if k == ord('d'): # TOGGLE RIGHT BORDER / MOVE VP RIGHT
+            if border_edit_mode:
+                toggle_border_right = not toggle_border_right
+            else:
+                vp.offset[0] = vp.offset[0] + max(1,dvp*vp_zoom)
         
         # MEDIA OUTPUT
         if k == ord('1'): # SAVE IMAGE
@@ -475,7 +505,7 @@ if __name__ == "__main__":
             if sound: playsound("sound/low.mp3", block = False)
             filename = ut.generate_filename(label)
             x2 = black_pad + w # -( 2*border_width)
-            frame = frame[dt:-db,black_pad:x2]
+            frame = frame[dtop:-dbot,black_pad:x2]
             cv.imwrite("projects/projector/"+filename,frame)
             print("Saved "+filename)
             print("SHAPE:",frame.shape)
