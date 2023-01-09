@@ -23,9 +23,9 @@ class Oscillator:
         print("Resolution: ",resolution)
         self.verbose = verbose
         self.resolution = resolution
-        
+
         self.points =  np.zeros((resolution),dtype=dtype)
-        
+
         self.position = self.get_position(offset,mode,verbose=True)
         self.offset = offset
         self.mode = mode
@@ -114,14 +114,14 @@ class Oscillator:
 
     def cat(self,osc,n=1):
         '''Concatenate current points with Oscillator/ndarray (osc) (n) times.'''
-        
+
         for i in range(n):
             print(type(osc))
             if type(osc) is Oscillator:
                 self.points = np.concatenate((self.points,osc.points),axis=0)
             if type(osc) is np.ndarray:
                 self.points = np.concatenate((self.points,osc),axis=0)
-        
+
         return self
 
     def step(self,amount=None):
@@ -183,13 +183,13 @@ class Oscillator:
                 last_pt = [xpos,point]
             if mode == 2: #Circles
                 img = cv.circle(img,[xpos,point],ds,color,dt)
-        
+
         if mode == 1: # Draw final line segment
             point = ((abs_range-self.points[self.position])/abs_range)*scale
             point = [width,int(min(height-1,point+ds))]
             img = cv.line(img,last_pt,point,color,dt)
 
-        
+
         # if width is not None:
         #     img = cv.resize(img,(width,height))
         # img = cv.cvtColor(img,cv.COLOR_GRAY2BGR)
@@ -197,9 +197,22 @@ class Oscillator:
         return img
 
 
+def create_XY_oscillators(origin,destination,step=6):
+    pass
+    try:
+        x_range = destination[0]-origin[0]
+        y_range = destination[1]-origin[1]
+        x_osc = Oscillator([math.cos,"*-1","+1","/2","*"+str(x_range),"+"+str(origin[0])],step)
+        # print(x_osc.points)
+        y_osc = Oscillator([math.cos,"*-1","+1","/2","*"+str(y_range),"+"+str(origin[1])],step)
+        # print(y_osc.points)
 
+        return x_osc, y_osc
+    except:
+        print("Something went wrong, origin and destination should be int lists with 2 items")
+        return None
 if __name__ == "__main__":
-    
+
     operations = [math.sin, math.cos,"/2"]
     operations = [math.sin]
     operations = [math.cosh,"/100",math.sin]

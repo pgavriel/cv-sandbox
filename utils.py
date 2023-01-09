@@ -17,6 +17,12 @@ def generate_filename(label, filetype='.jpg'):
 def constrain(n, minn, maxn):
     return max(min(maxn, n), minn)
 
+def pick_location(xbound=[400,1000],ybound=[200,800]):
+    xcoord = randint(xbound[0],xbound[1])
+    ycoord = randint(ybound[0],ybound[1])
+    print("Location chosen",[xcoord,ycoord])
+    return [xcoord,ycoord]
+    
 def draw_textline(image,string,org=[5,30],scale=1.0,c=(0,0,0),c2=(255,255,255),t=2,border=True):
     font = cv.FONT_HERSHEY_PLAIN
     if border: image = cv.putText(image,string,org,font,scale,c2,t+1,cv.LINE_AA)
@@ -30,12 +36,12 @@ def scale_image(image, percent,interp=cv.INTER_CUBIC):
     return resized
 
 def add_border(image, width, mode=1, color=(255,255,255), adj=[0,0,0,0], fixed_img_size=True, interp=cv.INTER_CUBIC):
-    """Adds a border to an image of specified width.   
-    MODES:   
-    0 - Solid Border (use color parameter to specify color)    
-    1 - Reflect Border (gfedcb|abcdefgh|gfedcba)  
-    2 - Extend Border (aaaaa|abcdefgh|hhhhh)   
-    fixed_img_size will resize the image to it's original dimensions after adding border.  
+    """Adds a border to an image of specified width.
+    MODES:
+    0 - Solid Border (use color parameter to specify color)
+    1 - Reflect Border (gfedcb|abcdefgh|gfedcba)
+    2 - Extend Border (aaaaa|abcdefgh|hhhhh)
+    fixed_img_size will resize the image to it's original dimensions after adding border.
     """
     (h, w) = image.shape[:2]
     if mode == 0: # SOLID COLOR
@@ -47,7 +53,7 @@ def add_border(image, width, mode=1, color=(255,255,255), adj=[0,0,0,0], fixed_i
     else:
         print("Unknown border mode.")
         return image
-    
+
     if fixed_img_size:
         bordered = cv.resize(bordered, (w,h), interpolation=interp)
 
@@ -95,7 +101,7 @@ def get_pixels(image,pos,h=1,w=1,verbose=True):
 
 def rotate(origin, point, angle):
     '''
-    Rotate a point counterclockwise by a given angle around a given origin. 
+    Rotate a point counterclockwise by a given angle around a given origin.
     The angle should be given in radians.'''
     ox, oy = origin
     px, py = point
