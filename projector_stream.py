@@ -10,6 +10,7 @@ from oscillator import create_XY_oscillators
 from oscillator import Oscillator
 from textanimator import TextAnimator
 from threading import Thread
+from animator import Animator
 
 # TODO
 # Easy Layer Edit Mode (Move, Scale, Rotate, Export, Import, Add, Remove)
@@ -104,7 +105,7 @@ if __name__ == "__main__":
         draw_layers = True
         animate_layers = True
         layer_selection = 0
-        layer_set_selection = 1
+        layer_set_selection = 0
         import layer_defs as ld
         wlk_dt = ld.wlkrz.dt
         draw_list = ld.layer_sets[layer_set_selection]
@@ -112,10 +113,16 @@ if __name__ == "__main__":
     except:
         print("oop")
 
+    # Create Animator
+    animation_mode = 0
+    defined_animation_modes = 5
+    animator = Animator(animation_mode)
+
+
     #Add patterns?
 
     #Border Attributes
-    add_border = True
+    add_border = False
     border_edit_mode = False
     toggle_border_top = False
     toggle_border_bot = False
@@ -154,6 +161,10 @@ if __name__ == "__main__":
     adj_bc = True
     brightness = 0
     contrast = 0.65
+
+    flip_state = 0
+
+    quit_safety = time.time()
 
     # Fix Aspect Ratio
     aspect_ratio = 16/9# 4/3 #16/9 #1
@@ -211,6 +222,9 @@ if __name__ == "__main__":
 
         frame = frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
 
+        if flip_state != 0:
+            frame = cv.flip(frame,flip_state-2)
+
         if mouse_changed:
             ut.get_pixels(frame,mouse_xy)
             mouse_xy = [mouse_xy[0]-black_pad,mouse_xy[1]]
@@ -237,14 +251,21 @@ if __name__ == "__main__":
             vp_off = vp.offset
 
         if frozen:
+            print(frame.shape)
+            print(freeze_frame.shape)
             frame = cv.addWeighted(frame, alpha, freeze_frame, beta, gamma)
 
-        if shift_color:
-            frame = ut.shift_color_space(frame,shift_amount,0)
+        # if shift_color:
+        #     frame = ut.shift_color_space(frame,shift_amount,0)
 
-        # if use_viewport:
-        #     frame = vp.view(frame)
-        #     vp_off = vp.offset
+        if add_border:
+            adj = []
+            adj.append((0 if toggle_border_top else borders[0])+dtop)
+            adj.append((0 if toggle_border_bot else borders[1])+dbot)
+            adj.append(0 if toggle_border_left else borders[2])
+            adj.append(0 if toggle_border_right else borders[3])
+            frame = ut.add_border(frame,0,border_mode,border_color,adj=adj)
+
 
         if draw_layers and len(draw_list) > 0:
             # if len(draw_list) > 0:
@@ -252,48 +273,8 @@ if __name__ == "__main__":
             a_frame = cv.cvtColor(frame, cv.COLOR_RGB2RGBA)
             a_frame[:, :, 3] = 255
 
-            # APPLY MODE DYNAMICS
-            x1 = int(ld.x_osc1.read())
-            ld.x_osc1.step()
-            y1 = int(ld.y_osc1.read())
-            ld.y_osc1.step()
-            x2 = int(ld.x_osc2.read())
-            ld.x_osc2.step()
-            y2 = int(ld.y_osc2.read())
-            ld.y_osc2.step()
-
-            for c, l in enumerate(draw_list):
-                if l.name == "1": l.translation = [x1,y1]
-                if l.name == "2": l.translation = [x2,y2]
-
-            # draw_list[1].translation = [x1,y1]
-            # draw_list[0].translation = [x2,y2]
-
-            if ld.y_osc1.position >= len(ld.y_osc1.points)//2: # New oscillator
-                print("NEW OSCS")
-                #Decide to split or converge
-                t1 = [0,0]
-                t2 = [0,0]
-                for c, l in enumerate(draw_list):
-                    if l.name == "1": t2 = draw_list[0].translation
-                    if l.name == "2": t1 = draw_list[1].translation
-                # t1 = draw_list[0].translation
-                # t2 = draw_list[1].translation
-                tol = 50
-                try:
-                    if abs(t1[0]-t2[0]) < tol and abs(t1[1]-t2[1]) < tol:
-                        print("Split")
-                        p1 = ld.pick_location()
-                        p2 = ld.pick_location()
-                        ld.x_osc1, ld.y_osc1 = create_XY_oscillators(t1,p1)
-                        ld.x_osc2, ld.y_osc2 = create_XY_oscillators(t2,p2)
-                    else:
-                        print("Converge")
-                        p1 = ld.pick_location()
-                        ld.x_osc1, ld.y_osc1 = create_XY_oscillators(t2,p1)
-                        ld.x_osc2, ld.y_osc2 = create_XY_oscillators(t1,p1)
-                except BaseException as e:
-                    print(traceback.format_exc())
+            # Apply animation to draw_list
+            if animate_layers: draw_list = animator.animate(draw_list)
 
             # DRAW LIST ONTO FRAME
             for x in draw_list:
@@ -323,13 +304,8 @@ if __name__ == "__main__":
 
 
 
-        if add_border:
-            adj = []
-            adj.append((0 if toggle_border_top else borders[0])+dtop)
-            adj.append((0 if toggle_border_bot else borders[1])+dbot)
-            adj.append(0 if toggle_border_left else borders[2])
-            adj.append(0 if toggle_border_right else borders[3])
-            frame = ut.add_border(frame,0,border_mode,border_color,adj=adj)
+        if shift_color:
+            frame = ut.shift_color_space(frame,shift_amount,0)
 
         if interlace and frame_num % interlace_skip <= interlace_duration:
             frame[:,:] = interlace_color
@@ -375,31 +351,35 @@ if __name__ == "__main__":
         # KEYBOARD CONTROLS -----------------------------------------------------
         # k = cv.waitKey(delay) & 0xFF
         k = cv.waitKey(real_delay) & 0xFF
-        # if k != 255: print(k)
-        if k == ord('i'): # Freeze Frame NO FLASH
-            if not frozen:
-                freeze_frame = streamer.frame.copy()
-                freeze_frame = freeze_frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
-            frozen = not frozen
-        if k == ord('o'): # Freeze Frame WITH FLASH
-            if not frozen:
-                cv.imshow('PiCam',white_frame)
-                for i in range(5):
-                    print("Grabbing frame")
-                    cv.waitKey(200)
-                    freeze_frame = streamer.frame.copy()
-                freeze_frame = freeze_frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
-            frozen = not frozen
-        if k == ord('['): # Decrease Freeze Blend Alpha
-            alpha = max(0.0, alpha - 0.05)
-            beta = 1.0 - alpha
-        if k == ord(']'): # Increase Freeze Blend Alpha
-            alpha = min(1.0, alpha + 0.05)
-            beta = 1.0 - alpha
-        if k == ord('7'): # Decrease Freeze Blend Gamma
-            gamma -= 2
-        if k == ord('8'): # Increase Freeze Blend Gamma
-            gamma += 2
+        if k != 255: print("Key Press: {}".format(k))
+        # OLD FREEZE FRAME CONTROLS
+        # if k == ord('i'): # Freeze Frame NO FLASH
+        #     if not frozen:
+        #         freeze_frame = streamer.frame.copy()
+        #         freeze_frame = freeze_frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
+        #         freeze_frame = cv.resize(freeze_frame,frame.shape[:2])
+        #     frozen = not frozen
+        # if k == ord('o'): # Freeze Frame WITH FLASH
+        #     if not frozen:
+        #         cv.imshow('PiCam',white_frame)
+        #         for i in range(5):
+        #             print("Grabbing frame")
+        #             cv.waitKey(200)
+        #             freeze_frame = streamer.frame.copy()
+        #         freeze_frame = freeze_frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
+        #     frozen = not frozen
+        # if k == ord('['): # Decrease Freeze Blend Alpha
+        #     alpha = max(0.0, alpha - 0.05)
+        #     beta = 1.0 - alpha
+        # if k == ord(']'): # Increase Freeze Blend Alpha
+        #     alpha = min(1.0, alpha + 0.05)
+        #     beta = 1.0 - alpha
+        # if k == ord('7'): # Decrease Freeze Blend Gamma
+        #     gamma -= 2
+        # if k == ord('8'): # Increase Freeze Blend Gamma
+        #     gamma += 2
+
+
         if k == ord('p'): # TOGGLE COLOR SHIFT
             shift_color = not shift_color
             print("[P] Color Shift "+("ENABLED"if shift_color else "DISABLED"))
@@ -411,25 +391,50 @@ if __name__ == "__main__":
             print("[0] Color shift increased: {}".format(shift_amount))
 
         # LAYER CONTROLS
-        if k == ord('t'): # TOGGLE LAYERS
+        if k == ord('3'): # TOGGLE LAYERS
             draw_layers = not draw_layers
             print("Layers "+("ENABLED"if draw_layers else "DISABLED"))
             if draw_layers:
                 for l in draw_list:
                     print(l)
-        if k == ord('y'): # TOGGLE LAYER ANIMATE
-            animate_layers = not animate_layers
-            print("Layer Animate "+("ENABLED"if animate_layers else "DISABLED"))
-        if k == ord('3'): # LAST LAYER
+        if k == ord('4'): # LAST LAYER
             # layer_selection = (layer_selection-1) % len(draw_list)
             layer_set_selection = (layer_set_selection-1) % len(ld.layer_sets)
             draw_list = ld.layer_sets[layer_set_selection]
             print("Layer Set Selection:",layer_set_selection)
-        if k == ord('4'): # NEXT LAYER
+        if k == ord('5'): # NEXT LAYER
             # layer_selection = (layer_selection+1) % len(draw_list)
             layer_set_selection = (layer_set_selection+1) % len(ld.layer_sets)
             draw_list = ld.layer_sets[layer_set_selection]
             print("Layer Set Selection:",layer_set_selection)
+        if k == ord('6'): # FLIP FIRST 2 LAYERS
+            try:
+                draw_list_tmp = draw_list[0]
+                draw_list[0] = draw_list[1]
+                draw_list[1] = draw_list_tmp
+            except:
+                print("Error flipping layers")
+
+        # ANIMATION CONTROLS
+        if k == ord('e'): # TOGGLE LAYER ANIMATE
+            animate_layers = not animate_layers
+            print("Layer Animate "+("ENABLED"if animate_layers else "DISABLED"))
+        if k == ord('r'): # PREV ANIMATION MODE
+            animation_mode = (animation_mode - 1) % defined_animation_modes
+            animator.set_mode(animation_mode)
+        if k == ord('t'): # NEXT ANIMATION MODE
+            animation_mode = (animation_mode + 1) % defined_animation_modes
+            animator.set_mode(animation_mode)
+        if k == ord('y'): # REFRESH MODE / GET NEW OSCILLATORS
+            animator.set_mode(animation_mode)
+        if k == ord('u'): # ANIMATOR SLOW DOWN
+            animator.speed_down()
+        if k == ord('i'): # ANIMATOR SPEED UP
+            animator.speed_up()
+        if k == ord('o'): # REVERSE ANIMATOR
+            animator.reverse()
+            print("Animator Reversed "+("TRUE"if animator.reversed else "FALSE"))
+
 
         # BORDER CONTROLS
         if k == ord('b'): # TOGGLE BORDER
@@ -467,9 +472,9 @@ if __name__ == "__main__":
             print("[L] Contrast Up: {}".format(contrast))
 
         # FILTER CONTROLS
-        if k == ord('f'): # TOGGLE FILTER
-            noise_filtering = not noise_filtering
-            print("[F] Noise Filtering "+("ENABLED"if noise_filtering else "DISABLED"))
+        # if k == ord('f'): # TOGGLE FILTER
+        #     noise_filtering = not noise_filtering
+        #     print("[F] Noise Filtering "+("ENABLED"if noise_filtering else "DISABLED"))
 
         # VIEWPORT CONTROLS
         if k == ord('v'): # TOGGLE VIEWPORT
@@ -478,11 +483,16 @@ if __name__ == "__main__":
         if k == ord('x'): # VIEWPORT ZOOM OUT
             vp_zoom += vp_zoom_inc
             vp_zoom = vp.set_scale(vp_zoom)
-            print("[X] Zoom In: ",round(vp_zoom,2))
+            print("[X] Zoom Out: ",round(vp_zoom,2))
         if k == ord('c'): # VIEWPORT ZOOM IN
             vp_zoom -= vp_zoom_inc
             vp_zoom = vp.set_scale(vp_zoom)
-            print("[C] Zoom Out: ",round(vp_zoom,2))
+            print("[C] Zoom In: ",round(vp_zoom,2))
+        if k == ord('f'): # CYCLE FLIP MODES
+            flip_state = (flip_state + 1) % 4
+            print("[F] Flip State: {}".format(flip_state))
+
+        # WASD
         dvp = 25
         if k == ord('w'): # TOGGLE TOP BORDER / MOVE VP UP
             if border_edit_mode:
@@ -531,13 +541,18 @@ if __name__ == "__main__":
                 print("Time: ",round(total_time,2))
                 recorder.release()
 
-        if k == ord('+'):
+        if k == ord('7'):
             lobby_time = not lobby_time
 
         # QUIT
         if k == ord('q'):
-            streamer.stop()
-            running = False
+            quit_safety_time = int((time.time() - quit_safety)*1000)
+            print("Quit Safety Time: {}ms".format(quit_safety_time))
+            if quit_safety_time > 1000:
+                quit_safety = time.time()
+            else:
+                streamer.stop()
+                running = False
 
 # cap.release()
 cv.destroyAllWindows()

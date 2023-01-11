@@ -19,18 +19,18 @@ class Oscillator:
         return s
 
     def __init__(self,operations=[],step=1,offset=0,mode=2,resolution=64,dtype=np.float16,verbose=False):
-        print("Constructing Oscillator...")
-        print("Resolution: ",resolution)
+        if verbose: print("Constructing Oscillator...")
+        if verbose: print("Resolution: ",resolution)
         self.verbose = verbose
         self.resolution = resolution
 
         self.points =  np.zeros((resolution),dtype=dtype)
 
-        self.position = self.get_position(offset,mode,verbose=True)
+        self.position = self.get_position(offset,mode,verbose=verbose)
         self.offset = offset
         self.mode = mode
         self.step_size = step
-        print("Step Size:", step)
+        if verbose: print("Step Size:", step)
 
         self.draw_layer = Layer()
         self.draw_w = 400
@@ -42,7 +42,7 @@ class Oscillator:
         self.draw_thick = 2
         self.draw_transparent = True
 
-        print("Operations: ",operations)
+        if verbose: print("Operations: ",operations)
         for i in range(len(self.points)):
             val = 0
             out_str = ""
@@ -75,7 +75,7 @@ class Oscillator:
             self.points[i] = val
         if verbose: print(self.points)
         if verbose: print("Points Length: ",len(self.points))
-        print("Current Position: {}/{}, Value: {}".format(self.position,len(self.points),self.points[self.position]))
+        if verbose: print("Current Position: {}/{}, Value: {}".format(self.position,len(self.points),self.points[self.position]))
 
     def get_position(self,offset,mode=None,verbose=None):
         if mode is None: mode = self.mode
@@ -98,6 +98,15 @@ class Oscillator:
             print("Unknown mode, returning position 0.")
 
         return pos
+
+    def set_offset(self,offset):
+        try:
+            self.offset = offset
+            self.position = self.get_position(offset,self.mode,verbose=self.verbose)
+        except:
+            print("Error setting osc offset")
+            print(traceback.format_exc())
+
 
     def set_range(self,rng=1):
         if self.verbose: print("Setting Range:", rng)
@@ -197,15 +206,14 @@ class Oscillator:
         return img
 
 
-def create_XY_oscillators(origin,destination,step=6):
-    pass
+def create_XY_oscillators(origin,destination,step=6,verbose=False):
     try:
         x_range = destination[0]-origin[0]
         y_range = destination[1]-origin[1]
         x_osc = Oscillator([math.cos,"*-1","+1","/2","*"+str(x_range),"+"+str(origin[0])],step)
-        # print(x_osc.points)
+        if verbose: print("X OSC - {}".format(x_osc.points))
         y_osc = Oscillator([math.cos,"*-1","+1","/2","*"+str(y_range),"+"+str(origin[1])],step)
-        # print(y_osc.points)
+        if verbose: print("Y OSC - {}".format(y_osc.points))
 
         return x_osc, y_osc
     except:

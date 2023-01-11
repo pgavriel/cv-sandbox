@@ -5,6 +5,7 @@ import os
 import time
 from PIL import Image
 from datetime import datetime
+from random import randint
 
 def generate_filename(label, filetype='.jpg'):
     dt = datetime.now()
@@ -22,7 +23,7 @@ def pick_location(xbound=[400,1000],ybound=[200,800]):
     ycoord = randint(ybound[0],ybound[1])
     print("Location chosen",[xcoord,ycoord])
     return [xcoord,ycoord]
-    
+
 def draw_textline(image,string,org=[5,30],scale=1.0,c=(0,0,0),c2=(255,255,255),t=2,border=True):
     font = cv.FONT_HERSHEY_PLAIN
     if border: image = cv.putText(image,string,org,font,scale,c2,t+1,cv.LINE_AA)
