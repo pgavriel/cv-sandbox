@@ -11,6 +11,8 @@ from oscillator import Oscillator
 from textanimator import TextAnimator
 from threading import Thread
 from animator import Animator
+from viewport_tool import Viewport
+from viewport_tool import ViewportAnimator
 
 # TODO
 # Easy Layer Edit Mode (Move, Scale, Rotate, Export, Import, Add, Remove)
@@ -69,30 +71,20 @@ def filter_image(image,mode=0):
 
 if __name__ == "__main__":
     # CREATE VIDEO STREAMER OBJECT
-    ip = "192.168.2.17"
-    port = "4040"
+    # ip = "192.168.2.17"
+    # port = "4040"
     # video_source = "tcp://"+ip+":"+port
     # streamer = VideoStreamer(video_source)
     streamer = VideoStreamer(0)
     streamer.start()
     cv.namedWindow("PiCam",cv.WINDOW_GUI_EXPANDED)
-    # cv.namedWindow("PiCam",cv.WINDOW_AUTOSIZE)
     cv.setMouseCallback("PiCam", click_event)
 
+    screen_size = [ 1920, 1080 ]
 
-
-    interlace = False
-    interlace_skip = 60
-    interlace_duration = 15
-    interlace_color = (255,255,255)
-
-    show_solid = False
-    solid_start = 0
-    solid_duration = 5
-    solid_color = (255,255,255)
 
     shift_color = False
-    shift_amount = 90
+    shift_amount = 15
 
     # Gain / brightness?
 
@@ -102,7 +94,7 @@ if __name__ == "__main__":
 
     #Create Layer list/ import layer def file and controls
     try:
-        draw_layers = True
+        draw_layers = False
         animate_layers = True
         layer_selection = 0
         layer_set_selection = 0
@@ -128,26 +120,23 @@ if __name__ == "__main__":
     toggle_border_bot = False
     toggle_border_left = False
     toggle_border_right = False
-    # border_width = 40
     border_mode = 0
     border_color = (255,255,255)
     dtop = 46
     dbot = 38
-    # dl = 0
-    # dr = 0
     borders = [40,40,40,40]
     border_inc = 10
 
     #Implement ImageViewport
-    use_viewport = False
-    vp_zoom = 1.0
-    vp_zoom_inc = 0.05
-    vp_off = [0,0]
-    vp = ImageViewport(vp_zoom,vp_off)
+    # use_viewport = False
+    # vp_zoom = 1.0
+    # vp_zoom_inc = 0.05
+    # vp_off = [0,0]
+    # vp = ImageViewport(vp_zoom,vp_off)
 
     # Freeze Frame
-    frozen = False
-    freeze_frame = None
+    # frozen = False
+    # freeze_frame = None
 
     running = True
     sound = False
@@ -203,28 +192,27 @@ if __name__ == "__main__":
     (h, w) = frame.shape[:2]
     recorder_dim = (w,h)
     black_pad = (1920-w)//2
-    white_frame = frame.copy()
-    white_frame[:,:] = (255,255,255)
-    white_frame = cv.copyMakeBorder(white_frame,0,0,black_pad,black_pad, cv.BORDER_CONSTANT, value=(0,0,0))
-    black_frame = frame.copy()
-    black_frame[:,:] = (0,0,0)
-    black_frame = cv.copyMakeBorder(black_frame,0,0,black_pad,black_pad, cv.BORDER_CONSTANT, value=(0,0,0))
+    # white_frame = frame.copy()
+    # white_frame[:,:] = (255,255,255)
+    # white_frame = cv.copyMakeBorder(white_frame,0,0,black_pad,black_pad, cv.BORDER_CONSTANT, value=(0,0,0))
+    # black_frame = frame.copy()
+    # black_frame[:,:] = (0,0,0)
+    # black_frame = cv.copyMakeBorder(black_frame,0,0,black_pad,black_pad, cv.BORDER_CONSTANT, value=(0,0,0))
     print("After A/R: ",frame.shape)
+
+    # Setup Viewport 
+    vp_step = 10
+    vp_mode = "relative"
+    vp = Viewport(frame,w//2,h//2,w,h)
+    vp.debug = False
+    vp.update()
+    vp_animator = ViewportAnimator()
+    vp_animator.update()
 
     while(running):
         start_time = time.time()
-        # ret, frame = cap.read()
-        frame = streamer.frame.copy()
-        if frame.shape[0] < 1080:
-            frame = cv.resize(frame,(int(1080*(w/h)),1080))
-            (h, w) = frame.shape[:2]
-        # Apply Aspect Ratio
-
-        frame = frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
-
-        if flip_state != 0:
-            frame = cv.flip(frame,flip_state-2)
-
+        
+        # HANDLE MOUSE EVENT ===============================
         if mouse_changed:
             ut.get_pixels(frame,mouse_xy)
             mouse_xy = [mouse_xy[0]-black_pad,mouse_xy[1]]
@@ -237,27 +225,48 @@ if __name__ == "__main__":
                     draw_list[layer_selection].draw_layer.translation = mouse_xy
                 print("Moved Layer to ",mouse_xy)
             else:
-                vp_x = int(vp_off[0]+vp_zoom*(mouse_xy[0]-(w/2)))
-                vp_y = int(vp_off[1]+vp_zoom*(mouse_xy[1]-(h/2)))
-                vp_off = [vp_x,vp_y]
-                vp.offset = vp_off
+                pass
+                # vp_x = int(vp_off[0]+vp_zoom*(mouse_xy[0]-(w/2)))
+                # vp_y = int(vp_off[1]+vp_zoom*(mouse_xy[1]-(h/2)))
+                # vp_off = [vp_x,vp_y]
+                # vp.offset = vp_off
             mouse_changed = False
 
-        if noise_filtering:
-            frame = cv.fastNlMeansDenoisingColored(frame,None,10,10,7,7)
+        # GET NEW FRAME
+        frame = streamer.frame.copy()
 
-        if use_viewport:
-            frame = vp.view(frame)
-            vp_off = vp.offset
+        if frame.shape[0] < 1080:
+            frame = cv.resize(frame,(int(1080*(w/h)),1080))
+            (h, w) = frame.shape[:2]
+        # Apply Aspect Ratio
+        frame = frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
 
-        if frozen:
-            print(frame.shape)
-            print(freeze_frame.shape)
-            frame = cv.addWeighted(frame, alpha, freeze_frame, beta, gamma)
+        # if noise_filtering:
+        #     frame = cv.fastNlMeansDenoisingColored(frame,None,10,10,7,7)
 
-        # if shift_color:
-        #     frame = ut.shift_color_space(frame,shift_amount,0)
+        vp_animator.update()
+        if vp_animator.playing:
+            vp.set_state(vp_animator.current_state)
+        vp.image = frame
+        vp.update()
+        frame = vp.view
+        frame = ut.scale_and_fill(frame,w,h)
 
+        if flip_state != 0:
+            frame = cv.flip(frame,flip_state-2)
+
+        # if use_viewport:
+        #     frame = vp.view(frame)
+        #     vp_off = vp.offset
+        
+
+        # if frozen:
+        #     print(frame.shape)
+        #     print(freeze_frame.shape)
+        #     frame = cv.addWeighted(frame, alpha, freeze_frame, beta, gamma)
+
+    
+        # ADD BORDERS ==================================================================================
         if add_border:
             adj = []
             adj.append((0 if toggle_border_top else borders[0])+dtop)
@@ -266,7 +275,7 @@ if __name__ == "__main__":
             adj.append(0 if toggle_border_right else borders[3])
             frame = ut.add_border(frame,0,border_mode,border_color,adj=adj)
 
-
+        # DRAW LAYERS OVER FRAME =======================================================================
         if draw_layers and len(draw_list) > 0:
             # if len(draw_list) > 0:
             # GIVE FRAME TRANSPARENCY
@@ -301,37 +310,26 @@ if __name__ == "__main__":
                 ld.lobby.draw_on(a_frame)
 
 
-
-
-
+        # SHIFT COLOR ==================================================================================
         if shift_color:
-            frame = ut.shift_color_space(frame,shift_amount,0)
+            # frame = ut.shift_color_space(frame,shift_amount,0)
+            frame = ut.shift_hue(frame,shift_amount)
 
-        if interlace and frame_num % interlace_skip <= interlace_duration:
-            frame[:,:] = interlace_color
 
-        if show_solid:
-            if solid_start + solid_duration > frame_num:
-                frame[:,:] = solid_color
-            else:
-                show_solid = False
-
-        # Adjust Brightness & Contrast
+        # ADJUST BRIGHTNESS & CONTRAST =================================================================
         if adj_bc:
             frame = cv.convertScaleAbs(frame,alpha=contrast,beta=brightness)
 
 
+        # SCALE FRAME TO FINAL SIZE ====================================================================
+        frame = ut.scale_and_fill(frame,screen_size[0],screen_size[1])
+
         frame_num += 1
-
-
-
-        # Pad Frame
-        # black_pad = (1920-w)//2
-        frame = cv.copyMakeBorder(frame,0,0,black_pad,black_pad, cv.BORDER_CONSTANT, value=(0,0,0))
-
 
         cv.imshow('PiCam', frame)
 
+
+        # WRITE FRAME IF RECORDING =====================================================================
         if recording and recorder is not None:
             if frame.shape[2] == 4:
                 frame = frame[:,:,:-1]
@@ -340,80 +338,64 @@ if __name__ == "__main__":
             # print("writing frame size ", frame.shape)
             recorder.write(frame)
 
-        # LOOP TIMER -----------------------------------------------------------
+        # LOOP TIMER ===================================================================================
         loop_time = int((time.time() - start_time)*1000)
         if loop_time > delay:
             print("WARNING Frame Time: {}ms - Desired Delay: {}ms".format(loop_time,delay))
         real_delay = max(1,delay-loop_time)
 
 
-
-        # KEYBOARD CONTROLS -----------------------------------------------------
+        # KEYBOARD CONTROLS ============================================================================
         # k = cv.waitKey(delay) & 0xFF
         k = cv.waitKey(real_delay) & 0xFF
         if k != 255: print("Key Press: {}".format(k))
-        # OLD FREEZE FRAME CONTROLS
-        # if k == ord('i'): # Freeze Frame NO FLASH
-        #     if not frozen:
-        #         freeze_frame = streamer.frame.copy()
-        #         freeze_frame = freeze_frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
-        #         freeze_frame = cv.resize(freeze_frame,frame.shape[:2])
-        #     frozen = not frozen
-        # if k == ord('o'): # Freeze Frame WITH FLASH
-        #     if not frozen:
-        #         cv.imshow('PiCam',white_frame)
-        #         for i in range(5):
-        #             print("Grabbing frame")
-        #             cv.waitKey(200)
-        #             freeze_frame = streamer.frame.copy()
-        #         freeze_frame = freeze_frame[slice_h:slice_h+new_h,slice_w:slice_w+new_w]
-        #     frozen = not frozen
-        # if k == ord('['): # Decrease Freeze Blend Alpha
-        #     alpha = max(0.0, alpha - 0.05)
-        #     beta = 1.0 - alpha
-        # if k == ord(']'): # Increase Freeze Blend Alpha
-        #     alpha = min(1.0, alpha + 0.05)
-        #     beta = 1.0 - alpha
-        # if k == ord('7'): # Decrease Freeze Blend Gamma
-        #     gamma -= 2
-        # if k == ord('8'): # Increase Freeze Blend Gamma
-        #     gamma += 2
 
 
         if k == ord('p'): # TOGGLE COLOR SHIFT
             shift_color = not shift_color
             print("[P] Color Shift "+("ENABLED"if shift_color else "DISABLED"))
         if k == ord('9'): # Decrease color shift
-            shift_amount = -(-shift_amount - 5)%360
+            shift_amount = (shift_amount - 5)%180
             print("[9] Color shift decreased: {}".format(shift_amount))
         if k == ord('0'): # Increase color shift
-            shift_amount = -(-shift_amount + 5)%360
+            shift_amount = (shift_amount + 5)%180
             print("[0] Color shift increased: {}".format(shift_amount))
 
         # LAYER CONTROLS
-        if k == ord('3'): # TOGGLE LAYERS
-            draw_layers = not draw_layers
-            print("Layers "+("ENABLED"if draw_layers else "DISABLED"))
-            if draw_layers:
-                for l in draw_list:
-                    print(l)
-        if k == ord('4'): # LAST LAYER
-            # layer_selection = (layer_selection-1) % len(draw_list)
-            layer_set_selection = (layer_set_selection-1) % len(ld.layer_sets)
-            draw_list = ld.layer_sets[layer_set_selection]
-            print("Layer Set Selection:",layer_set_selection)
-        if k == ord('5'): # NEXT LAYER
-            # layer_selection = (layer_selection+1) % len(draw_list)
-            layer_set_selection = (layer_set_selection+1) % len(ld.layer_sets)
-            draw_list = ld.layer_sets[layer_set_selection]
-            print("Layer Set Selection:",layer_set_selection)
-        if k == ord('6'): # FLIP FIRST 2 LAYERS
-            try:
-                draw_list_tmp = draw_list[0]
-                draw_list[0] = draw_list[1]
-                draw_list[1] = draw_list_tmp
-            except:
-                print("Error flipping layers")
+        # HIJACKING THESE CONTROLS TO TEST VIEWPORT ANIMATOR
+        # if k == ord('3'): # TOGGLE LAYERS
+        #     draw_layers = not draw_layers
+        #     print("Layers "+("ENABLED"if draw_layers else "DISABLED"))
+        #     if draw_layers:
+        #         for l in draw_list:
+        #             print(l)
+        # if k == ord('4'): # LAST LAYER
+        #     # layer_selection = (layer_selection-1) % len(draw_list)
+        #     layer_set_selection = (layer_set_selection-1) % len(ld.layer_sets)
+        #     draw_list = ld.layer_sets[layer_set_selection]
+        #     print("Layer Set Selection:",layer_set_selection)
+        # if k == ord('5'): # NEXT LAYER
+        #     # layer_selection = (layer_selection+1) % len(draw_list)
+        #     layer_set_selection = (layer_set_selection+1) % len(ld.layer_sets)
+        #     draw_list = ld.layer_sets[layer_set_selection]
+        #     print("Layer Set Selection:",layer_set_selection)
+        # if k == ord('6'): # FLIP FIRST 2 LAYERS
+        #     try:
+        #         draw_list_tmp = draw_list[0]
+        #         draw_list[0] = draw_list[1]
+        #         draw_list[1] = draw_list_tmp
+        #     except:
+        #         print("Error flipping layers")
+        if k == ord('3'):
+            vp.reset()
+        if k == ord('4'): # Reset
+            print(vp_animator)
+        if k == ord('5'): # Add state
+            vp_animator.add_state(vp.get_state())
+        if k == ord('6'): # Animator playpause
+            vp_animator.playpause()
+        if k == ord('7'):
+            vp_animator.reset()
 
         # ANIMATION CONTROLS
         if k == ord('e'): # TOGGLE LAYER ANIMATE
@@ -477,17 +459,25 @@ if __name__ == "__main__":
         #     print("[F] Noise Filtering "+("ENABLED"if noise_filtering else "DISABLED"))
 
         # VIEWPORT CONTROLS
-        if k == ord('v'): # TOGGLE VIEWPORT
-            use_viewport = not use_viewport
-            print("[V] Viewport "+("ENABLED"if use_viewport else "DISABLED"))
-        if k == ord('x'): # VIEWPORT ZOOM OUT
-            vp_zoom += vp_zoom_inc
-            vp_zoom = vp.set_scale(vp_zoom)
-            print("[X] Zoom Out: ",round(vp_zoom,2))
-        if k == ord('c'): # VIEWPORT ZOOM IN
-            vp_zoom -= vp_zoom_inc
-            vp_zoom = vp.set_scale(vp_zoom)
-            print("[C] Zoom In: ",round(vp_zoom,2))
+        # if k == ord('v'): # TOGGLE VIEWPORT
+        #     use_viewport = not use_viewport
+        #     print("[V] Viewport "+("ENABLED"if use_viewport else "DISABLED"))
+        if k == ord('z'): # VIEWPORT ZOOM OUT
+            # vp_zoom += vp_zoom_inc
+            # vp_zoom = vp.set_scale(vp_zoom)
+            vp.h = int(min(vp.h * 1.1,h))
+            vp.w = int(min(vp.w * 1.1,w))
+            print("[Z] Zoom Out: ",vp.w,vp.h)
+        if k == ord('x'): # VIEWPORT ZOOM IN
+            # vp_zoom -= vp_zoom_inc
+            # vp_zoom = vp.set_scale(vp_zoom)
+            vp.h = int(max(vp.h * 0.9,10))
+            vp.w = int(max(vp.w * 0.9,10))
+            print("[X] Zoom In: ",vp.w,vp.h)
+        if k == ord('c'): # Rotate Right
+            vp.a = (vp.a - 2) % 360
+        if k == ord('v'): # Rotate Left
+            vp.a = (vp.a + 2) % 360
         if k == ord('f'): # CYCLE FLIP MODES
             flip_state = (flip_state + 1) % 4
             print("[F] Flip State: {}".format(flip_state))
@@ -498,22 +488,22 @@ if __name__ == "__main__":
             if border_edit_mode:
                 toggle_border_top = not toggle_border_top
             else:
-                vp.offset[1] = vp.offset[1] - max(1,dvp*vp_zoom)
+                vp.move("up",vp_step,vp_mode)
         if k == ord('s'): # TOGGLE BOTTOM BORDER / MOVE VP DOWN
             if border_edit_mode:
                 toggle_border_bot = not toggle_border_bot
             else:
-                vp.offset[1] = vp.offset[1] + max(1,dvp*vp_zoom)
+                vp.move("down",vp_step,vp_mode)
         if k == ord('a'): # TOGGLE LEFT BORDER / MOVE VP LEFT
             if border_edit_mode:
                 toggle_border_left = not toggle_border_left
             else:
-                vp.offset[0] = vp.offset[0] - max(1,dvp*vp_zoom)
+                vp.move("left",vp_step,vp_mode)
         if k == ord('d'): # TOGGLE RIGHT BORDER / MOVE VP RIGHT
             if border_edit_mode:
                 toggle_border_right = not toggle_border_right
             else:
-                vp.offset[0] = vp.offset[0] + max(1,dvp*vp_zoom)
+                vp.move("right",vp_step,vp_mode)
 
         # MEDIA OUTPUT
         if k == ord('1'): # SAVE IMAGE
@@ -541,8 +531,8 @@ if __name__ == "__main__":
                 print("Time: ",round(total_time,2))
                 recorder.release()
 
-        if k == ord('7'):
-            lobby_time = not lobby_time
+        # if k == ord('7'):
+        #     lobby_time = not lobby_time
 
         # QUIT
         if k == ord('q'):

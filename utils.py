@@ -110,3 +110,47 @@ def rotate(origin, point, angle):
     qx = ox + math.cos(angle) * (px - ox) - math.sin(angle) * (py - oy)
     qy = oy + math.sin(angle) * (px - ox) + math.cos(angle) * (py - oy)
     return qx, qy
+
+def scale_and_fill(image, desired_width, desired_height):
+    # Calculate the aspect ratio of the input image
+    aspect_ratio = image.shape[1] / image.shape[0]
+    
+    # Calculate the scaling factors for width and height
+    scale_factor_width = desired_width / image.shape[1]
+    scale_factor_height = desired_height / image.shape[0]
+    
+    # Choose the smaller scaling factor to maintain aspect ratio
+    scale_factor = min(scale_factor_width, scale_factor_height)
+    
+    # Calculate the new dimensions
+    new_width = int(image.shape[1] * scale_factor)
+    new_height = int(image.shape[0] * scale_factor)
+    
+    # Resize the image
+    resized_image = cv.resize(image, (new_width, new_height))
+    
+    # Create a black canvas of the desired dimensions
+    output_image = np.zeros((desired_height, desired_width, 3), dtype=np.uint8)
+    
+    # Calculate the position to paste the resized image
+    x_offset = (desired_width - new_width) // 2
+    y_offset = (desired_height - new_height) // 2
+    
+    # Paste the resized image onto the canvas
+    output_image[y_offset:y_offset + new_height, x_offset:x_offset + new_width] = resized_image
+    
+    return output_image
+
+def shift_hue(image, shift_value):
+    shift = shift_value % 180
+    
+    # Convert the image to HSV color space
+    hsv_image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+    
+    # Shift the hue channel
+    hsv_image[:, :, 0] = (hsv_image[:, :, 0] + shift) % 180
+    
+    # Convert back to BGR color space
+    shifted_image = cv.cvtColor(hsv_image, cv.COLOR_HSV2BGR)
+    
+    return shifted_image

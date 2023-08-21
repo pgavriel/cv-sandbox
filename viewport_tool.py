@@ -1,4 +1,5 @@
 import cv2
+import utils as ut
 import numpy as np
 
 class Viewport:
@@ -31,6 +32,8 @@ class Viewport:
         self.stop()
         self.x = self.image.shape[1]//2
         self.y = self.image.shape[0]//2
+        self.w = self.image.shape[1]
+        self.h = self.image.shape[0]
         self.a = 0
         self.rw = int(self.w * np.abs(np.cos(np.radians(self.a))) + self.h * np.abs(np.sin(np.radians(self.a))))
         self.rh = int(self.w * np.abs(np.sin(np.radians(self.a))) + self.h * np.abs(np.cos(np.radians(self.a))))
@@ -111,13 +114,13 @@ class Viewport:
                 print("oops",(self.x , self.y ), line_endpoint)
 
             # Show the display image with the viewport
-            cv2.imshow('Viewport Controls', display_image)
+            # cv2.imshow('Viewport Controls', display_image)
             # Show the extracted and unrotated region
-            cv2.imshow('Rotated Region', rotated_box_region)
+            # cv2.imshow('Rotated Region', rotated_box_region)
             # Show the corrected extracted region
-            cv2.imshow('Adjusted Region', unrotated_box_region)
+            # cv2.imshow('Adjusted Region', unrotated_box_region)
             # Show the viewport
-            cv2.imshow('Viewport Region', viewport_region)
+            # cv2.imshow('Viewport Region', viewport_region)
 
 
     def move(self, direction, step=10, mode="absolute"):
@@ -273,92 +276,98 @@ class ViewportAnimator:
         self.states = []
         self.steps = []
 
+    def print_state(self):
+        pass
+        # implement to print a copy pasteable code snippet to
 
-# Load an image
-image = cv2.imread('img/test2.png')  # Replace with your image path
-if image is None:
-    print("Error loading image.")
-    exit()
+if __name__ == "__main__":
+    # Load an image
+    image = cv2.imread('img/test2.png')  # Replace with your image path
+    if image is None:
+        print("Error loading image.")
+        exit()
 
 
-vp = Viewport(image)
-animator = ViewportAnimator()
+    vp = Viewport(image)
+    animator = ViewportAnimator()
 
-vp.update()
-
-animator.add_state([300,300,300,300,15])
-animator.add_state([300,300,300,300,270])
-animator.update()
-animator.playpause()
-step = 10
-vp_mode = "relative"
-while True:
-    animator.update()
-    if animator.playing:
-        vp.set_state(animator.current_state)
-    
     vp.update()
-    key = cv2.waitKey(50)
-    
-    # Exit the loop on 'q'
-    if key == ord('q'):
-        break
-    
-    # Move the viewport
-    
-    elif key == ord('w'):
-        # viewport_y = max(rotated_height/2, viewport_y - 10)
-        vp.move("up",step,vp_mode)
-    elif key == ord('a'):
-        # viewport_x = max(rotated_width/2, viewport_x - 10)
-        vp.move("left",step,vp_mode)
-    elif key == ord('s'):
-        # viewport_y = min(image.shape[0] - (rotated_height/2), viewport_y + 10)
-        vp.move("down",step,vp_mode)
-    elif key == ord('d'):
-        # viewport_x = min(image.shape[1] - (rotated_width/2), viewport_x + 10)
-        vp.move("right",step,vp_mode)
-    
-    # Rotate the viewport
-    elif key == ord('e'):
-        vp.da -= 1
-    elif key == ord('r'):
-        vp.da += 1
-        # vp.a = (vp.a + 5) % 360
-        # print("Angle:",vp.a, "  sine:",np.sin(np.radians(vp.a)))
-        # if abs(np.sin(np.radians(vp.a))) > abs(np.cos(np.radians(vp.a))):
-        #     print("error")
-    
-    # Scale the viewport
-    elif key == ord('+'):
-        # viewport_scale += 0.1
-        vp.h = int(min(vp.h * 1.1,1000))
-        vp.w = int(min(vp.w * 1.1,1000))
-    elif key == ord('-'):
-        # viewport_scale = max(0.1, viewport_scale - 0.1)
-        vp.h = int(max(vp.h * 0.9,10))
-        vp.w = int(max(vp.w * 0.9,10))
 
-    elif key == ord('z'):
-        vp.reset()
+    animator.add_state([300,300,300,300,15])
+    animator.add_state([300,300,300,300,270])
+    animator.update()
+    animator.playpause()
+    step = 10
+    vp_mode = "relative"
+    while True:
+        animator.update()
+        if animator.playing:
+            vp.set_state(animator.current_state)
+        
+        vp.update()
+        new_frame = ut.scale_and_fill(vp.view,1920,1080)
+        cv2.imshow('Viewport Region', new_frame)
+        key = cv2.waitKey(50)
+        
+        # Exit the loop on 'q'
+        if key == ord('q'):
+            break
+        
+        # Move the viewport
+        
+        elif key == ord('w'):
+            # viewport_y = max(rotated_height/2, viewport_y - 10)
+            vp.move("up",step,vp_mode)
+        elif key == ord('a'):
+            # viewport_x = max(rotated_width/2, viewport_x - 10)
+            vp.move("left",step,vp_mode)
+        elif key == ord('s'):
+            # viewport_y = min(image.shape[0] - (rotated_height/2), viewport_y + 10)
+            vp.move("down",step,vp_mode)
+        elif key == ord('d'):
+            # viewport_x = min(image.shape[1] - (rotated_width/2), viewport_x + 10)
+            vp.move("right",step,vp_mode)
+        
+        # Rotate the viewport
+        elif key == ord('e'):
+            vp.da -= 1
+        elif key == ord('r'):
+            vp.da += 1
+            # vp.a = (vp.a + 5) % 360
+            # print("Angle:",vp.a, "  sine:",np.sin(np.radians(vp.a)))
+            # if abs(np.sin(np.radians(vp.a))) > abs(np.cos(np.radians(vp.a))):
+            #     print("error")
+        
+        # Scale the viewport
+        elif key == ord('+'):
+            # viewport_scale += 0.1
+            vp.h = int(min(vp.h * 1.1,1000))
+            vp.w = int(min(vp.w * 1.1,1000))
+        elif key == ord('-'):
+            # viewport_scale = max(0.1, viewport_scale - 0.1)
+            vp.h = int(max(vp.h * 0.9,10))
+            vp.w = int(max(vp.w * 0.9,10))
 
-    elif key == ord('v'): # Animator playpause
-        animator.playpause()
-    elif key == ord('b'): # Add state
-        animator.add_state(vp.get_state())
-    elif key == ord('n'): # Reset
-        print(animator)
-    elif key == ord('m'):
-        animator.reset()
+        elif key == ord('z'):
+            vp.reset()
 
-    elif key == ord('8'): # VP Height +
-        vp.h += 50
-    elif key == ord('2'): # VP Height -
-        vp.h -= 50
-    elif key == ord('6'): # VP Width +
-        vp.w += 50
-    elif key == ord('4'): # VP Width -
-        vp.w -= 50
+        elif key == ord('v'): # Animator playpause
+            animator.playpause()
+        elif key == ord('b'): # Add state
+            animator.add_state(vp.get_state())
+        elif key == ord('n'): # Reset
+            print(animator)
+        elif key == ord('m'):
+            animator.reset()
 
-# Release resources
-cv2.destroyAllWindows()
+        elif key == ord('8'): # VP Height +
+            vp.h += 50
+        elif key == ord('2'): # VP Height -
+            vp.h -= 50
+        elif key == ord('6'): # VP Width +
+            vp.w += 50
+        elif key == ord('4'): # VP Width -
+            vp.w -= 50
+
+    # Release resources
+    cv2.destroyAllWindows()
